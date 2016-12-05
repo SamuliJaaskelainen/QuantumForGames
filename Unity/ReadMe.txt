@@ -1,0 +1,1 @@
+This is the root for Unity project that is used to generate Unity Package addon for devs.
