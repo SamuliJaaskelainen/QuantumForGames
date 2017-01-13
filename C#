@@ -1,0 +1,261 @@
+// C# code for the quantum gates
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Numerics; // add a reference
+
+namespace QuantumGates
+{
+    class Program
+    {
+        public static Complex im = new Complex(0, 1);
+        public static Complex[,] NOT = new Complex[2, 2] { {0, 1 }, { 1, 0 } }; // NOT-gate or Pauli X-gate
+        public static Complex[,] Y = new Complex[2, 2] { { 0, -im }, { im, 0 } }; // Pauli Y-gate
+        public static Complex[,] Z = new Complex[2, 2] { { 1, 0 }, { 0, -1 } }; // Pauli Z-gate
+        public static Complex[,] HADAMARD = new Complex[2, 2] { { 1/Math.Sqrt(2), 1 / Math.Sqrt(2) }, { 1 / Math.Sqrt(2), -1 / Math.Sqrt(2) } }; // Hadamard-gate
+        public static Complex[,] PHASE = new Complex[2, 2] { { 1, 0 }, { 0, im } }; // phase-gate
+        public static Complex[,] T = new Complex[2, 2] { { 1, 0 }, { 0, new Complex(1 / Math.Sqrt(2), 1 / Math.Sqrt(2))} }; // T-gate
+
+        static void Main(string[] args)
+        {
+            // Some test for the gates to see they're working
+            int n = 2;
+            Complex[,] matrix = gateCNOT(n, 1, 2);
+            Complex[,] matrix2 = gateOnTarget(Y, 0, n);
+            for (int i = 0; i < Math.Pow(2, n); i++)
+            {
+                String s = "";
+                for (int j = 0; j < Math.Pow(2, n); j++)
+               {
+                    s = s + matrix2[i, j] + " ";
+               }
+                Debug.WriteLine(s);
+           }
+        }
+
+
+        //Returns a n x n identity matrix
+        public static Complex[,] identityMatrix(int n)
+        {
+            Complex[,] identity = new Complex[n, n];
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    if (i == j)
+                    {
+                        identity[i, j] = 1;
+                    }
+                    else
+                    {
+                        identity[i, j] = 0;
+                    }
+                }
+            }
+            return identity;
+        }
+
+        // Returns a n x n zeromatrix
+        public static Complex[,] zeroMatrix(int n)
+        {
+            Complex[,] zero = new Complex[n, n];
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    zero[i, j] = 0;
+                }
+            }
+            return zero;
+        }
+
+        // Matrix product for two square matrices of the same dimension
+        public static Complex[,] matrixProduct(Complex[,] m1, Complex[,] m2)
+        {
+            int n = m1.GetLength(0);
+            Complex[,] product = zeroMatrix(n);
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    Complex temp = 0;
+                    for (int k = 0; k < n; k++)
+                    {
+                        temp = temp + m1[i, k] * m2[k, j];
+                    }
+                    product[i, j] = temp;
+                }
+            }
+            return product;
+        }
+
+        // Recursive generalization of the product of any number of matrices (in a list)
+        public static Complex[,] matrixProduct(List<Complex[,]> mlist)
+        {
+            if(mlist.Count == 1)
+            {
+                return mlist[0];
+            }
+            if (mlist.Count == 2)
+            {
+                return matrixProduct(mlist[0], mlist[1]);
+            }
+            else
+            {
+                Complex[,] m1 = mlist[0];
+                mlist.RemoveAt(0);
+                return matrixProduct(m1, matrixProduct(mlist));
+            }
+        }
+
+        // Kronecker product of two matrices
+        public static Complex[,] kroneckerProduct(Complex[,] m1, Complex[,] m2)
+        {
+            int m = m1.GetLength(0);
+            int n = m1.GetLength(1);
+            int p = m2.GetLength(0);
+            int q = m2.GetLength(1);
+            Complex[,] kproduct = new Complex[m * p, n * q];
+            for (int w = 0; w < q; w++)
+            {
+                for (int v = 0; v < p; v++)
+                {
+                    for (int s = 0; s < n; s++)
+                    {
+                        for (int r = 0; r < m; r++)
+                        {
+                            kproduct[p * r + v, q * s + w] = m1[r, s]*m2[v, w];
+                        }
+                    }
+                }
+            }
+            return kproduct;
+        }
+
+        // Recursive generalization of the Kronecker product of any number of matrices (in a list)
+        public static Complex[,] kroneckerProduct(List<Complex[,]> mlist)
+        {
+            if(mlist.Count == 1)
+            {
+                return mlist[0];
+            }
+            if (mlist.Count == 2)
+            {
+                return kroneckerProduct(mlist[0], mlist[1]);
+            }
+            else
+            {
+                Complex[,] m1 = mlist[0];
+                mlist.RemoveAt(0);
+                return kroneckerProduct(m1, kroneckerProduct(mlist));
+            }
+        }
+
+        // Creates a matrix of a gate acting on a specified target qubit of a n-qubit state
+        public static Complex[,] gateOnTarget(Complex[,] gate, int target, int n)
+        {
+            if (n >= target)
+            {
+                List<Complex[,]> mlist = new List<Complex[,]>();
+                for (int i = 0; i < n; i++)
+                {
+                    if (i == target - 1)
+                    {
+                        mlist.Add(gate);
+                    }
+                    else
+                    {
+                        mlist.Add(identityMatrix(2));
+                    }
+                }
+                return kroneckerProduct(mlist);
+            }
+            else
+            {
+                return zeroMatrix((int)Math.Pow(2, n));
+            }
+        }
+
+        // Converts integers 0 - 2^n -1 to binary and takes them to an array of vectors (for bases)
+        public static int[][] tuples(int n)
+        {
+            int power = (int)Math.Pow(2, n);
+            int[][] tuple = new int[power][];
+            for (int i = 0; i < power; i++)
+            {
+                tuple[i] = new int[n];
+                String s = Convert.ToString(i, 2);
+                for (int j = s.Length; j < n; j++)
+                {
+                    s = "0" + s;
+                }
+                Char[] ch = s.ToCharArray();
+                for (int k = 0; k < n; k++)
+                {
+                    tuple[i][k] = (int)Char.GetNumericValue(ch[k]);
+                }
+            }
+            return tuple;
+        }
+
+        // The transformation rule for qubits in CNOT-gate
+        public static int[] cnotRule(int[] bvec)
+        {
+            if (bvec[0] == 1)
+            {
+                if (bvec[1] == 1)
+                {
+                    return new int[2] { 1, 0 };
+                }
+                else
+                {
+                    return new int[2] { 1, 1 };
+                }
+            }
+            else
+            {
+                return bvec;
+            }
+        }
+
+        // Constructs the 2^n x 2^n matrix of the CNOT-gate acting on a n-qubit state, specifies the contorol and the target qubit
+        public static Complex[,] gateCNOT(int n, int control, int target)
+        {
+            if(n >= control && n >= target && control != target)
+            {
+                int[][] basisin = tuples(n);
+                int[][] basisout = tuples(n);
+                for (int i = 0; i < Math.Pow(2, n); i++)
+                {
+                    int[] vec = new int[2] { basisin[i][control - 1], basisin[i][target - 1] };
+                    basisout[i][target - 1] = cnotRule(vec)[1];
+                }
+                Complex[,] matrix = zeroMatrix((int)Math.Pow(2, n));
+                for (int i = 0; i < Math.Pow(2, n); i++)
+                {
+                    for (int j = 0; j < Math.Pow(2, n); j++)
+                    {
+                        if (basisout[i].SequenceEqual(basisin[j]))
+                        {
+                            matrix[i, j] = 1;
+                            break;
+                        }
+                    }
+                }
+                return matrix;
+            }
+            else
+            {
+                return zeroMatrix((int) Math.Pow(2,n));
+            }
+        }
+
+
+
+    }
+}
+
